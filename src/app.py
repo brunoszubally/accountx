@@ -5,6 +5,7 @@ from flask import Flask, jsonify, request
 from datetime import datetime
 import os
 from dotenv import load_dotenv
+import hashlib
 
 app = Flask(__name__)
 load_dotenv()
@@ -21,14 +22,22 @@ SOFTWARE_DATA = {
     "softwareDevTaxNumber": "12345678"
 }
 
-# NAV API konfiguráció
-API_URL = os.getenv("NAV_API_URL", "https://api-test.onlineszamla.nav.gov.hu/invoiceService/v3")
+# NAV API konfiguráció (éles környezet)
+API_URL = os.getenv("NAV_API_URL", "https://api.onlineszamla.nav.gov.hu/invoiceService/v3")
 NS = {"ns": "http://schemas.nav.gov.hu/OSA/3.0/api"}
+
+def hash_password(password):
+    """SHA-512 hashelés a jelszóhoz"""
+    return hashlib.sha512(password.encode('utf-8')).hexdigest().upper()
 
 def get_token(user_data):
     """Token lekérése a NAV API-tól"""
     token_url = f"{API_URL}/tokenExchange"
     headers = {"Content-Type": "application/xml", "Accept": "application/xml"}
+    
+    # Jelszó hashelés
+    password_hash = hash_password(user_data['password'])
+    
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
     <TokenExchangeRequest xmlns="http://schemas.nav.gov.hu/OSA/3.0/api">
         <header>
@@ -39,7 +48,7 @@ def get_token(user_data):
         </header>
         <user>
             <login>{user_data['login']}</login>
-            <passwordHash>{user_data['password']}</passwordHash>
+            <passwordHash>{password_hash}</passwordHash>
             <taxNumber>{user_data['taxNumber']}</taxNumber>
             <requestSignature>{user_data['signKey']}</requestSignature>
         </user>
@@ -103,7 +112,7 @@ def get_invoices():
                 </header>
                 <user>
                     <login>{user_data['login']}</login>
-                    <passwordHash>{user_data['password']}</passwordHash>
+                    <passwordHash>{hash_password(user_data['password'])}</passwordHash>
                     <taxNumber>{user_data['taxNumber']}</taxNumber>
                     <requestSignature>{user_data['signKey']}</requestSignature>
                 </user>
